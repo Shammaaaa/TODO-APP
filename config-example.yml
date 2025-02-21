@@ -1,0 +1,11 @@
+database:
+    host: localhost
+    port: 5432
+    user: user
+    password: pass
+    name: order
+    dialect: postgres
+    debug: true
+    max_open_conns: 20
+    max_idle_conns: 15
+    max_conn_max_lifetime: 10m0s
