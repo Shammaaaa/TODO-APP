@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"log"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,25 +18,34 @@ func WithTransaction(ctx context.Context, pool *pgxpool.Pool, fn TxFn) (err erro
 	// Начинаем транзакцию
 	tx, err := pool.Begin(ctx)
 	if err != nil {
+		log.Printf("Failed to begin transaction: %v", err)
 		return err
 	}
 
 	// Отложенный вызов для обработки отката или коммита
 	defer func() {
 		if p := recover(); p != nil {
-			// В случае паники откатываем транзакцию и повторно вызываем панику
-			_ = tx.Rollback(ctx)
+			rollbackErr := tx.Rollback(ctx)
+			if rollbackErr != nil {
+				log.Printf("Failed to rollback transaction after panic: %v", rollbackErr)
+			}
 			panic(p)
 		} else if err != nil {
-			// Если есть ошибка, откатываем транзакцию
-			_ = tx.Rollback(ctx)
+			rollbackErr := tx.Rollback(ctx)
+			if rollbackErr != nil {
+				log.Printf("Failed to rollback transaction: %v", rollbackErr)
+			}
 		} else {
-			// Если все хорошо, коммитим транзакцию
 			err = tx.Commit(ctx)
+			if err != nil {
+				log.Printf("Failed to commit transaction: %v", err)
+			}
 		}
 	}()
 
-	// Выполняем переданную функцию внутри транзакции
 	err = fn(tx)
+	if err != nil {
+		log.Printf("Transaction function failed: %v", err)
+	}
 	return err
 }
